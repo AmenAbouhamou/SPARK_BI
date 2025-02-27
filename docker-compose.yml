@@ -1,0 +1,34 @@
+services:
+  spark:
+    image: spark:3.4.4-scala2.12-java11-r-ubuntu
+    container_name: spark
+    user: root  # Run the container as root to allow installations
+    command: [ "/bin/bash", "-c", "apt-get update && apt-get install -y curl && \
+                  echo 'deb https://repo.scala-sbt.org/scalasbt/debian all main' > /etc/apt/sources.list.d/sbt.list && \
+                  curl -sL 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x99E82A75642AC823' | apt-key add - && \
+                  apt-get update && apt-get install -y sbt scala && \
+                  usermod -aG sudo spark && chown -R spark:spark /home/spark && \
+                  tail -f /dev/null" ]
+    ports:
+      - 4040:4040  # Spark Web UI
+      - 7077:7077  # Spark Master Port
+      - 8080:8080  # Spark Master Web UI
+      - 8081:8081  # Spark Worker Web UI
+      - 1521:1521  # Oracle Port
+      - 5432:5432  # Postgres Port
+    networks:
+      - spark-net
+    environment:
+      - SPARK_MODE=master
+      - SPARK_DAEMON_JAVA_OPTS=--add-opens java.base/sun.nio.ch=ALL-UNNAMED
+      - SPARK_DRIVER_JAVA_OPTS=--add-opens java.base/sun.nio.ch=ALL-UNNAMED
+      - SPARK_EXECUTOR_JAVA_OPTS=--add-opens java.base/sun.nio.ch=ALL-UNNAMED
+    volumes:
+      - ./spark:/home/spark/etl
+      - ./data:/home/spark/data
+    working_dir: /home/spark/etl
+    restart: always  # Ensure the container always restarts if it fails
+
+networks:
+  spark-net:
+    driver: bridge
