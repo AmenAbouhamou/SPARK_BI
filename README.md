@@ -67,6 +67,13 @@ Ce projet vise à explorer les concepts de l'informatique décisionnelle en réa
 - **Login** : Identifiant IEM
 - **Mot de passe** : Identique à l’identifiant
 
+### Postgres sur serveur Kafka
+- **Port** : 5432
+- **Base** : `login` (schéma `public`)
+- **Login** : `login`
+- **Mot de passe** : `login`
+- **Connexion** : `psql -U login login`
+
 ---
 
 ## 📚 Références
