@@ -4,16 +4,17 @@ import org.apache.spark.sql.functions._
 import java.util.Properties
 
 object business_EL {
-	def integrate_business(spark: SparkSession,shopFile: String,connectionProperties: Properties,url: String): Unit = {
+	def integrate_business(spark: SparkSession,shopFile: String,cnxKafka: Properties,urlKafka: String): Unit = {
 
 		var shop = spark.read.json(shopFile).cache()
-		shop = shop.withColumn("business_id", col("business_id").cast(StringType))
+		shop = shop
+			.withColumn("city", trim( initcap( lower( regexp_replace( regexp_replace( regexp_replace(col("city"),",.*", ""), "[^a-zA-ZéèàôûâîÎœ'\\-]", " "),"\\s+"," " ) ) ) ) )
+			.select("business_id","name","state","city","is_open")
 
 		shop.printSchema()
-		var shopn=shop.select("business_id","name","state","city","is_open")
 
-		shopn.write
-			.mode(SaveMode.Overwrite).jdbc(url, "business", connectionProperties)
+		shop.write
+			.mode(SaveMode.Overwrite).jdbc(urlKafka, "business", cnxKafka)
 
 	}
 }

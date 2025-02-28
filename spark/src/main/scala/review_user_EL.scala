@@ -3,23 +3,17 @@ import org.apache.spark.sql.functions._
 import java.util.Properties
 
 object review_user_EL {
-  def integrate_review_user(spark: SparkSession): Unit = {
-    // Connexion PostgreSQL
-    val pgUrl = "jdbc:postgresql://stendhal.iem:5432/tpid2020"
-    val pgProps = new Properties()
-    pgProps.setProperty("user", "tpid")
-    pgProps.setProperty("password", "tpid")
-    pgProps.setProperty("driver", "org.postgresql.Driver")
+  def integrate_review_user(spark: SparkSession,urlPostgres: String,cnxPostgres: Properties,urlKafka: String,cnxKafka: Properties): Unit = {
 
     // Chargement de la table `review` depuis PostgreSQL
     val reviewDF = spark.read
-      .jdbc(pgUrl, "yelp.review", pgProps)
+      .jdbc(urlPostgres, "yelp.review", cnxPostgres)
       .select(
-        col("review_id").alias("REVIEW_ID"),  // Clé primaire
-        col("text").alias("TEXT"),
-        col("useful").cast("int").alias("USEFUL"),
-        col("cool").cast("int").alias("COOL"),
-        col("funny").cast("int").alias("FUNNY")
+        col("review_id").alias("review_id"),  // Clé primaire
+        col("text").alias("text"),
+        col("useful").cast("int").alias("useful"),
+        col("cool").cast("int").alias("cool"),
+        col("funny").cast("int").alias("funny")
       )
       .distinct() // Évite les doublons potentiels
       .persist()
@@ -27,17 +21,10 @@ object review_user_EL {
     // Vérification des données avant insertion
     reviewDF.show(10)
 
-    // Connexion Oracle
-  val urlKafka = "jdbc:postgresql://kafka.iem:5432/aa224325"
-    val cnxKafka = new Properties()
-    cnxKafka.setProperty("driver", "org.postgresql.Driver")
-    cnxKafka.setProperty("user", "aa224325")
-    cnxKafka.setProperty("password", "aa224325")
-
     // Insertion dans la table Oracle "REVIEW_USER"
     reviewDF.write
       .mode(SaveMode.Overwrite)
-      .jdbc(urlKafka, "REVIEW_USER", cnxKafka)
+      .jdbc(urlKafka, "review_user", cnxKafka)
 
     println("Données insérées avec succès dans REVIEW_USER !")
   }
