@@ -16,7 +16,7 @@ object user_yelp_EL {
 
     var timeDF = spark
       .read
-      .jdbc(urlkafka, "TIME", cnxkafka)
+      .jdbc(urlkafka, "time", cnxkafka)
 
     var timeDF_date = timeDF
       .withColumn("time_id", col("time_id").cast("int"))
@@ -27,7 +27,7 @@ object user_yelp_EL {
       .drop("year", "month", "day")
 
     var joinedDF = user
-      .join(timeDF_date, user("yelping_since") === timeDF_date("date"), "inner")
+      .join(timeDF_date, user("yelping_since") === timeDF_date("date"), "left")
 
     var user_yelp = joinedDF
       .drop("yelping_since", "date")

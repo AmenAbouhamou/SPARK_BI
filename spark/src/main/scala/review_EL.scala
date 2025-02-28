@@ -10,29 +10,29 @@ object review_EL {
     val reviewDF = spark.read
       .jdbc(urlPostgres, "review", cnxPostgres)
       .select(
-        col("review_id").alias("REVIEW_ID"),
-        col("user_id").alias("USER_ID"),
-        col("business_id").alias("BUSINESS_ID"),
-        col("date").alias("DATE"),
-        col("stars").alias("STARS")
+        col("review_id").alias("review_id"),
+        col("user_id").alias("user_id"),
+        col("business_id").alias("business_id"),
+        col("date").alias("date"),
+        col("stars").alias("stars")
       )
       .distinct()
 
-    //  Charger `TIME` depuis Oracle pour récupérer `TIME_ID`
+    //  Charger `time` depuis Oracle pour récupérer `time_id`
     val timeDF = spark.read
-      .jdbc(urlKafka, "TIME", cnxKafka)
-      .select("TIME_ID", "YEAR", "MONTH", "DAY")
+      .jdbc(urlKafka, "time", cnxKafka)
+      .select("time_id", "year", "month", "day")
       .withColumn("time_id",col("time_id").cast(IntegerType))
 
-    //  Associer `review.DATE` avec `TIME_ID`
+    //  Associer `review.date` avec `time_id`
     val reviewWithTime_left = reviewDF
-      .withColumn("YEAR", year(col("DATE")))
-      .withColumn("MONTH", month(col("DATE")))
-      .withColumn("DAY", dayofmonth(col("DATE")))
-      .join(timeDF, Seq("YEAR", "MONTH", "DAY"), "left") // ⬅️ INNER JOIN pour s'assurer de la correspondance
+      .withColumn("year", year(col("date")))
+      .withColumn("month", month(col("date")))
+      .withColumn("day", dayofmonth(col("date")))
+      .join(timeDF, Seq("year", "month", "day"), "left") // ⬅️ INNER JOIN pour s'assurer de la correspondance
       // ⬅️ Sélectionner les bonnes colonnes
 
-    val timeIdNullDF = reviewWithTime_left.filter(col("TIME_ID").isNull)
+    val timeIdNullDF = reviewWithTime_left.filter(col("time_id").isNull)
 
     // Sauvegarde en CSV
     timeIdNullDF.coalesce(1)
@@ -42,55 +42,55 @@ object review_EL {
       .option("delimiter", ",")
       .csv("./time_id_not_found_data")
 
-    //  Afficher les lignes avec `TIME_ID` nul
-    val reviewWithTime = reviewWithTime_left.filter(col("TIME_ID").isNotNull).select("REVIEW_ID", "USER_ID", "BUSINESS_ID", "TIME_ID", "STARS")
+    //  Afficher les lignes avec `time_id` nul
+    val reviewWithTime = reviewWithTime_left.filter(col("time_id").isNotNull).select("review_id", "user_id", "business_id", "time_id", "stars")
 
     //  Afficher le schéma et les 5 premières lignes
-    println("Schéma après jointure avec TIME :")
+    println("Schéma après jointure avec time :")
     reviewWithTime.printSchema()
     reviewWithTime.show(5)
 
-    //  Charger et compter `NB_CATEGORIES` depuis `CATEGORY`
+    //  Charger et compter `nb_categories` depuis `category`
     val categoryDF = spark.read
-      .jdbc(urlKafka, "CATEGORY", cnxKafka)
-      .groupBy("BUSINESS_ID")
-      .agg(count("*").alias("NB_CATEGORIES")) // Nombre de catégories par business
+      .jdbc(urlKafka, "category", cnxKafka)
+      .groupBy("business_id")
+      .agg(count("*").alias("nb_categories")) // Nombre de catégories par business
 
-    //  Charger les check-ins (`NB_CONNEXION`) depuis le fichier JSON
+    //  Charger les check-ins (`nb_connexion`) depuis le fichier JSON
     val checkinDF = spark.read.json(checkinpath)
 
     val businessCheckinsDF = checkinDF
       .withColumn("date", explode(split(col("date"), ",\\s*"))) // Séparer les dates de check-in
       .groupBy("business_id")
-      .agg(count("date").alias("NB_CONNEXION")) // Compter le nombre de check-ins
+      .agg(count("date").alias("nb_connexion")) // Compter le nombre de check-ins
 
-    // Calculer `REVIEW_COUNT` (nombre total de reviews par user)
-    val userReviewCountDF = reviewDF
-      .groupBy("USER_ID")
-      .agg(count("REVIEW_ID").alias("REVIEW_COUNT")) // Nombre de reviews par user
+    // Calculer `review_count` (nombre total de reviews par user)
+    val userreviewCountDF = reviewDF
+      .groupBy("user_id")
+      .agg(count("review_id").alias("review_count")) // Nombre de reviews par user
 
-    // Associer `BUSINESS_ID` avec `NB_CATEGORIES` et `NB_CONNEXION`
+    // Associer `business_id` avec `nb_categories` et `nb_connexion`
     val reviewWithStats = reviewWithTime
-      .join(categoryDF, Seq("BUSINESS_ID"), "inner") // Associer avec `CATEGORY`
-      .join(businessCheckinsDF, Seq("BUSINESS_ID"), "inner") // Associer avec `check-in`
-      .join(userReviewCountDF, Seq("USER_ID"), "inner") // Associer avec `REVIEW_COUNT`
-      .na.fill(0, Seq("NB_CATEGORIES", "NB_CONNEXION", "REVIEW_COUNT")) // Remplace `null` par 0
+      .join(categoryDF, Seq("business_id"), "inner") // Associer avec `category`
+      .join(businessCheckinsDF, Seq("business_id"), "inner") // Associer avec `check-in`
+      .join(userreviewCountDF, Seq("user_id"), "inner") // Associer avec `review_count`
+      .na.fill(0, Seq("nb_categories", "nb_connexion", "review_count")) // Remplace `null` par 0
 
 
       reviewWithStats.show()
 
 
-    // println(" Schéma final avant insertion dans REVIEW :")
+    // println(" Schéma final avant insertion dans review :")
     // reviewWithStats.printSchema()
     // reviewWithStats.show(5)
 
     // //  Insérer les nouvelles `review` dans Oracle
     reviewWithStats.write
       .mode(SaveMode.Overwrite)
-      .jdbc(urlKafka, "REVIEW", cnxKafka)
+      .jdbc(urlKafka, "review", cnxKafka)
 
 
 
-    // println("Données insérées avec succès dans la table REVIEW !")
+    // println("Données insérées avec succès dans la table review !")
   }
 }
